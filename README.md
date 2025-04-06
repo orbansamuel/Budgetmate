@@ -12,7 +12,9 @@ Ez egy egyszerű kiadáskezelő webalkalmazás Spring Boot (backend) és React +
 
 .
 ├── backend                  # Spring Boot API (Java)
+
 ├── budgetmate-frontend      # React + Tailwind CSS frontend
+
 └── README.md
 
 ## 🔧 Telepítés
