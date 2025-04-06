@@ -10,7 +10,7 @@ export default function HomePage() {
     <div className="flex flex-col items-center justify-center px-4 py-10 space-y-10 max-w-6xl mx-auto">
       
       <img
-        src="../public/photos/logo2.png"
+        src="/photos/logo2.png"
         alt="BudgetMate logó"
         className="h-48 mx-auto mb-4 drop-shadow-xl"
       />
@@ -67,7 +67,7 @@ export default function HomePage() {
 
           <section className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
             <img
-              src="public\photos\depositphotos_253625476-stock-photo-starting-his-own-business-rich.jpg"
+              src="\photos\depositphotos_253625476-stock-photo-starting-his-own-business-rich.jpg"
               alt="Budgeting dashboard"
               className="rounded-2xl shadow-xl w-full h-auto"
             />
