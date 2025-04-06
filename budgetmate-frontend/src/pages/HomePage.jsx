@@ -6,10 +6,19 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-100 via-blue-100 to-purple-100 overflow-y-auto">
-      <div className="flex flex-col items-center justify-center px-4 py-10 space-y-10 max-w-6xl mx-auto">
-        <div className="text-center space-y-10 animate-fade-in">
-          <h1 className="text-5xl font-extrabold text-gray-900 drop-shadow">Üdvözöl a BudgetMate!</h1>
+<div className="min-h-screen bg-gradient-to-br from-green-100 via-blue-100 to-purple-100 overflow-y-auto">
+    <div className="flex flex-col items-center justify-center px-4 py-10 space-y-10 max-w-6xl mx-auto">
+      
+      <img
+        src="../public/photos/logo2.png"
+        alt="BudgetMate logó"
+        className="h-48 mx-auto mb-4 drop-shadow-xl"
+      />
+
+      <div className="text-center space-y-10 animate-fade-in">
+        <h1 className="text-5xl font-extrabold text-gray-900 drop-shadow">
+          Üdvözöl a BudgetMate!
+        </h1>
           <p className="text-gray-700 text-lg max-w-2xl mx-auto">
             A BudgetMate egy modern, letisztult pénzügyi alkalmazás, amely segít a kiadásaid és bevételeid rendszerezésében, pénzügyi céljaid elérésében és a tudatos megtakarításban.
           </p>
