@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const [form, setForm] = useState({
@@ -8,14 +9,14 @@ export default function LoginPage() {
   });
 
   const navigate = useNavigate();
+  const { login, user } = useAuth(); // 👈 új: auth context
 
   // 🔐 Ha már be van jelentkezve, irány a dashboardra
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
+    if (user) {
       navigate("/dashboard");
     }
-  }, []);
+  }, [user]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.id]: e.target.value });
@@ -32,10 +33,10 @@ export default function LoginPage() {
 
       if (!res.ok) throw new Error("Hibás email vagy jelszó");
 
-      const user = await res.json();
-      localStorage.setItem("user", JSON.stringify(user)); // 💾 mentés
-      alert("Sikeres bejelentkezés, üdv: " + user.fullName);
-      navigate("/dashboard"); // ⏩ tovább a dashboardra
+      const userData = await res.json();
+      login(userData); // 👈 auth contextbe mentjük
+      alert("Sikeres bejelentkezés, üdv: " + userData.fullName);
+      navigate("/dashboard");
     } catch (err) {
       alert("Hiba: " + err.message);
     }
@@ -77,16 +78,15 @@ export default function LoginPage() {
             Bejelentkezés
           </button>
         </form>
+
         <p className="mt-6 text-center text-sm text-gray-600">
           Nincs még fiókod? <a href="/regisztracio" className="text-blue-500 hover:underline">Regisztrálj itt</a>
         </p>
 
         <p className="mt-4 text-center text-sm text-gray-600">
-  <a href="/" className="text-blue-500 hover:underline">⬅ Vissza a főoldalra</a>
-</p>
-
+          <a href="/" className="text-blue-500 hover:underline">⬅ Vissza a főoldalra</a>
+        </p>
       </div>
-      
     </div>
   );
 }

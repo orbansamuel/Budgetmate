@@ -1,8 +1,1 @@
 @import "tailwindcss";
-
-body{
-    width:100dvw;
-    background-color: gray;
-    overflow-x: hidden;
-
-}

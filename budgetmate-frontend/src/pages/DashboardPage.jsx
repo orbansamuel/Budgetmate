@@ -1,6 +1,8 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user"));
 
   return (
@@ -24,9 +26,12 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Kiadás gomb és kijelentkezés */}
+        {/* Gombok */}
         <div className="flex justify-between mt-4">
-          <button className="px-6 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition">
+          <button
+            onClick={() => navigate("/expenses")}
+            className="px-6 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition"
+          >
             Kiadások kezelése
           </button>
           <button
