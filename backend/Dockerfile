@@ -8,7 +8,8 @@ WORKDIR /app
 COPY . .
 
 # Fordítsuk le a projektet, tesztek nélkül
-RUN ./mvnw clean package -DskipTests
+RUN chmod +x mvnw && ./mvnw clean package -DskipTests
+
 
 # Futtassuk az elkészült JAR fájlt
 CMD ["java", "-jar", "target/backend-0.0.1-SNAPSHOT.jar"]
