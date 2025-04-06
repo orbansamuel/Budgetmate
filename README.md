@@ -38,10 +38,7 @@ A frontend ezután elérhető: http://localhost:5173
 
 ## 🧪 Teszt felhasználók
 
-Használhatsz saját regisztrációt, vagy például:
-
-Email: teszt@email.hu  
-Jelszó: password
+Használhatsz saját regisztrációt!
 
 ## 🔐 Funkciók
 
@@ -61,8 +58,4 @@ Jelszó: password
 ## 🤝 Közreműködők
 
 - Készítette: orbansamuel
-- Ha szeretnél hozzájárulni, nyugodtan küldj Pull Request-et!
 
-## 📝 Licenc
-
-Ez a projekt szabadon használható tanulási célokra.
