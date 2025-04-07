@@ -12,7 +12,7 @@ export default function HomePage() {
       <img
         src="/photos/logo2.png"
         alt="BudgetMate logó"
-        className="h-48 mx-auto mb-4 drop-shadow-xl"
+        className="h-36 mx-auto mb-4 drop-shadow-xl"
       />
 
       <div className="text-center space-y-10 animate-fade-in">
