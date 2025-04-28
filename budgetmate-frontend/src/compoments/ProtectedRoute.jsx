@@ -3,8 +3,8 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute({ children }) {
-  //const { user } = useAuth();
+  const { user } = useAuth();
 
-  //if (!user) return <Navigate to="/bejelentkezes" replace />;
+  if (!user) return <Navigate to="/bejelentkezes" replace />;
   return children;
 }

@@ -1,19 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function LocalExpensesPage() {
-  const [expenses, setExpenses] = useState(() => {
-    const saved = localStorage.getItem('localExpenses');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [incomes, setIncomes] = useState(() => {
-    const saved = localStorage.getItem('localIncomes');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [recurringTransactions, setRecurringTransactions] = useState(() => {
-    const saved = localStorage.getItem('recurringTransactions');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [expenses, setExpenses] = useState([]);
+  const [incomes, setIncomes] = useState([]);
+  const [recurringTransactions, setRecurringTransactions] = useState([]);
   const [newExpense, setNewExpense] = useState({ title: "", amount: "", category: "Egyéb" });
   const [newIncome, setNewIncome] = useState({ title: "", amount: "", category: "Fizetés" });
   const [newRecurring, setNewRecurring] = useState({
@@ -28,6 +19,8 @@ export default function LocalExpensesPage() {
   const [editingIncome, setEditingIncome] = useState(null);
   const [activeTab, setActiveTab] = useState("expenses");
   const navigate = useNavigate();
+  const location = useLocation();
+  const user = JSON.parse(localStorage.getItem("user"));
 
   const expenseCategories = ["Élelmiszer", "Számlák", "Szórakozás", "Közlekedés", "Egyéb"];
   const incomeCategories = ["Fizetés", "Bónusz", "Befektetés", "Egyéb"];
@@ -38,170 +31,172 @@ export default function LocalExpensesPage() {
     { value: "yearly", label: "Évente" }
   ];
 
-  // Save data to localStorage whenever they change
+  // Fetch data on mount
   useEffect(() => {
-    localStorage.setItem('localExpenses', JSON.stringify(expenses));
-    localStorage.setItem('localIncomes', JSON.stringify(incomes));
-    localStorage.setItem('recurringTransactions', JSON.stringify(recurringTransactions));
-  }, [expenses, incomes, recurringTransactions]);
+    if (!user?.email) return;
 
-  // Check and process recurring transactions
+    // Fetch expenses
+    fetch(`${import.meta.env.VITE_API_BASE}/api/expenses/${encodeURIComponent(user.email)}`)
+      .then(res => res.json())
+      .then(data => setExpenses(Array.isArray(data) ? data : []))
+      .catch(() => setExpenses([]));
+
+    // Fetch incomes
+    fetch(`${import.meta.env.VITE_API_BASE}/api/incomes/${encodeURIComponent(user.email)}`)
+      .then(res => res.json())
+      .then(data => setIncomes(Array.isArray(data) ? data : []))
+      .catch(() => setIncomes([]));
+
+    // Fetch recurring transactions
+    fetch(`${import.meta.env.VITE_API_BASE}/api/recurring/${encodeURIComponent(user.email)}`)
+      .then(res => res.json())
+      .then(data => setRecurringTransactions(Array.isArray(data) ? data : []))
+      .catch(() => setRecurringTransactions([]));
+  }, [user?.email]);
+
   useEffect(() => {
-    const now = new Date();
-    const processedTransactions = new Set();
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab === "incomes") setActiveTab("incomes");
+    else if (tab === "recurring") setActiveTab("recurring");
+    else setActiveTab("expenses");
+  }, [location.search]);
 
-    recurringTransactions.forEach(transaction => {
-      const lastProcessed = new Date(transaction.lastProcessed || transaction.startDate);
-      const shouldProcess = shouldProcessTransaction(transaction, lastProcessed, now);
-
-      if (shouldProcess) {
-        const newTransaction = {
-          id: Date.now(),
-          title: transaction.title,
-          amount: parseFloat(transaction.amount),
-          category: transaction.category,
-          date: now.toISOString(),
-          type: transaction.type
-        };
-
-        if (transaction.type === "expense") {
-          setExpenses(prev => [...prev, newTransaction]);
-        } else {
-          setIncomes(prev => [...prev, newTransaction]);
-        }
-
-        processedTransactions.add(transaction.id);
-      }
-    });
-
-    // Update last processed dates
-    if (processedTransactions.size > 0) {
-      setRecurringTransactions(prev => 
-        prev.map(t => processedTransactions.has(t.id) 
-          ? { ...t, lastProcessed: now.toISOString() }
-          : t
-        )
-      );
-    }
-  }, []);
-
-  const shouldProcessTransaction = (transaction, lastProcessed, now) => {
-    const diff = now - lastProcessed;
-    const dayInMs = 24 * 60 * 60 * 1000;
-
-    switch (transaction.interval) {
-      case "daily":
-        return diff >= dayInMs;
-      case "weekly":
-        return diff >= 7 * dayInMs;
-      case "monthly":
-        return now.getMonth() !== lastProcessed.getMonth() || now.getFullYear() !== lastProcessed.getFullYear();
-      case "yearly":
-        return now.getFullYear() !== lastProcessed.getFullYear();
-      default:
-        return false;
-    }
-  };
-
-  const handleAddRecurring = (e) => {
+  const handleAddExpense = async (e) => {
     e.preventDefault();
-  
-    if (!newRecurring.title || !newRecurring.amount) {
+    if (!newExpense.title || !newExpense.amount || !user?.email) {
       alert("Minden mezőt ki kell tölteni!");
       return;
     }
-  
-    if (isNaN(parseFloat(newRecurring.amount))) {
-      alert("Az összegnek számnak kell lennie!");
-      return;
-    }
-  
-    const recurringToAdd = {
-      id: Date.now(),
-      ...newRecurring,
-      amount: parseFloat(newRecurring.amount),
-      lastProcessed: newRecurring.startDate
-    };
-  
-    setRecurringTransactions(prev => [...prev, recurringToAdd]);
-    setNewRecurring({
-      title: "",
-      amount: "",
-      category: "Fizetés",
-      type: "income",
-      interval: "monthly",
-      startDate: new Date().toISOString().split('T')[0]
-    });
-    alert("Rendszeres tranzakció sikeresen hozzáadva!");
-  };
-
-  const handleDeleteRecurring = (id) => {
-    if (window.confirm("Biztosan törölni szeretnéd ezt a rendszeres tranzakciót?")) {
-      setRecurringTransactions(prev => prev.filter(item => item.id !== id));
-    }
-  };
-
-  const handleAddExpense = (e) => {
-    e.preventDefault();
-  
-    if (!newExpense.title || !newExpense.amount) {
-      alert("Minden mezőt ki kell tölteni!");
-      return;
-    }
-  
     if (isNaN(parseFloat(newExpense.amount))) {
       alert("Az összegnek számnak kell lennie!");
       return;
     }
-  
-    const expenseToAdd = {
-      id: Date.now(),
-      title: newExpense.title,
+    const expenseToSend = {
+      ...newExpense,
       amount: parseFloat(newExpense.amount),
-      category: newExpense.category,
-      date: new Date().toISOString(),
-      type: "expense"
+      userEmail: user.email,
     };
-  
-    setExpenses(prev => [...prev, expenseToAdd]);
-    setNewExpense({ title: "", amount: "", category: "Egyéb" });
-    alert("Kiadás sikeresen hozzáadva!");
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(expenseToSend),
+      });
+      if (!res.ok) throw new Error("Hiba a kiadás hozzáadásakor");
+      const added = await res.json();
+      setExpenses(prev => [...prev, added]);
+      setNewExpense({ title: "", amount: "", category: "Egyéb" });
+      alert("Kiadás sikeresen hozzáadva!");
+    } catch (err) {
+      console.error("Error:", err);
+      alert("Nem sikerült hozzáadni a kiadást.");
+    }
   };
 
-  const handleAddIncome = (e) => {
+  const handleAddIncome = async (e) => {
     e.preventDefault();
-  
-    if (!newIncome.title || !newIncome.amount) {
+    if (!newIncome.title || !newIncome.amount || !user?.email) {
       alert("Minden mezőt ki kell tölteni!");
       return;
     }
-  
     if (isNaN(parseFloat(newIncome.amount))) {
       alert("Az összegnek számnak kell lennie!");
       return;
     }
-  
-    const incomeToAdd = {
-      id: Date.now(),
-      title: newIncome.title,
+    const incomeToSend = {
+      ...newIncome,
       amount: parseFloat(newIncome.amount),
-      category: newIncome.category,
-      date: new Date().toISOString(),
-      type: "income"
+      userEmail: user.email,
     };
-  
-    setIncomes(prev => [...prev, incomeToAdd]);
-    setNewIncome({ title: "", amount: "", category: "Fizetés" });
-    alert("Bevétel sikeresen hozzáadva!");
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/incomes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(incomeToSend),
+      });
+      if (!res.ok) throw new Error("Hiba a bevétel hozzáadásakor");
+      const added = await res.json();
+      setIncomes(prev => [...prev, added]);
+      setNewIncome({ title: "", amount: "", category: "Fizetés" });
+      alert("Bevétel sikeresen hozzáadva!");
+    } catch (err) {
+      console.error("Error:", err);
+      alert("Nem sikerült hozzáadni a bevételt.");
+    }
   };
 
-  const handleDeleteItem = (id, type) => {
-    if (window.confirm("Biztosan törölni szeretnéd ezt a tételt?")) {
+  const handleAddRecurring = async (e) => {
+    e.preventDefault();
+    if (!newRecurring.title || !newRecurring.amount || !user?.email) {
+      alert("Minden mezőt ki kell tölteni!");
+      return;
+    }
+    if (isNaN(parseFloat(newRecurring.amount))) {
+      alert("Az összegnek számnak kell lennie!");
+      return;
+    }
+    const recurringToSend = {
+      ...newRecurring,
+      amount: parseFloat(newRecurring.amount),
+      userEmail: user.email,
+    };
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/recurring`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(recurringToSend),
+      });
+      if (!res.ok) throw new Error("Hiba a rendszeres tranzakció hozzáadásakor");
+      const added = await res.json();
+      setRecurringTransactions(prev => [...prev, added]);
+      setNewRecurring({
+        title: "",
+        amount: "",
+        category: "Fizetés",
+        type: "income",
+        interval: "monthly",
+        startDate: new Date().toISOString().split('T')[0]
+      });
+      alert("Rendszeres tranzakció sikeresen hozzáadva!");
+    } catch (err) {
+      console.error("Error:", err);
+      alert("Nem sikerült hozzáadni a rendszeres tranzakciót.");
+    }
+  };
+
+  const handleDeleteItem = async (id, type) => {
+    if (!window.confirm("Biztosan törölni szeretnéd ezt a tételt?")) return;
+    try {
+      const endpoint = type === "expense" ? "expenses" : "incomes";
+      const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/${endpoint}/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Hiba a törlés során");
       if (type === "expense") {
         setExpenses(prev => prev.filter(item => item.id !== id));
       } else {
         setIncomes(prev => prev.filter(item => item.id !== id));
       }
+      alert("Tétel sikeresen törölve!");
+    } catch (err) {
+      console.error("Error:", err);
+      alert("Nem sikerült törölni a tételt.");
+    }
+  };
+
+  const handleDeleteRecurring = async (id) => {
+    if (!window.confirm("Biztosan törölni szeretnéd ezt a rendszeres tranzakciót?")) return;
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/recurring/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Hiba a törlés során");
+      setRecurringTransactions(prev => prev.filter(item => item.id !== id));
+      alert("Rendszeres tranzakció sikeresen törölve!");
+    } catch (err) {
+      console.error("Error:", err);
+      alert("Nem sikerült törölni a rendszeres tranzakciót.");
     }
   };
 
@@ -213,35 +208,62 @@ export default function LocalExpensesPage() {
     }
   };
 
-  const handleSaveEdit = (e) => {
+  const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (editingExpense) {
       if (!editingExpense.title || !editingExpense.amount) {
         alert("Minden mezőt ki kell tölteni!");
         return;
       }
-      setExpenses(prev => prev.map(item => 
-        item.id === editingExpense.id ? editingExpense : item
-      ));
-      setEditingExpense(null);
-      alert("Kiadás sikeresen módosítva!");
+      try {
+        const updatedExpense = {
+          ...editingExpense,
+          user: { id: user.id },
+        };
+        const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/expenses/${editingExpense.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedExpense),
+        });
+        if (!res.ok) throw new Error("Hiba a módosítás során");
+        const updated = await res.json();
+        setExpenses(prev => prev.map(item => item.id === updated.id ? updated : item));
+        setEditingExpense(null);
+        alert("Kiadás sikeresen módosítva!");
+      } catch (err) {
+        console.error("Error:", err);
+        alert("Nem sikerült módosítani a kiadást.");
+      }
     } else if (editingIncome) {
       if (!editingIncome.title || !editingIncome.amount) {
         alert("Minden mezőt ki kell tölteni!");
         return;
       }
-      setIncomes(prev => prev.map(item => 
-        item.id === editingIncome.id ? editingIncome : item
-      ));
-      setEditingIncome(null);
-      alert("Bevétel sikeresen módosítva!");
+      try {
+        const updatedIncome = {
+          ...editingIncome,
+          user: { id: user.id },
+        };
+        const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/incomes/${editingIncome.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedIncome),
+        });
+        if (!res.ok) throw new Error("Hiba a módosítás során");
+        const updated = await res.json();
+        setIncomes(prev => prev.map(item => item.id === updated.id ? updated : item));
+        setEditingIncome(null);
+        alert("Bevétel sikeresen módosítva!");
+      } catch (err) {
+        console.error("Error:", err);
+        alert("Nem sikerült módosítani a bevételt.");
+      }
     }
   };
 
   const handleAmountChange = (e, type) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
     const validValue = value === '' ? '' : parseInt(value, 10).toString();
-    
     if (type === "expense") {
       if (editingExpense) {
         setEditingExpense({ ...editingExpense, amount: validValue });
@@ -533,7 +555,7 @@ export default function LocalExpensesPage() {
         {/* Rendszeres tranzakciók */}
         {activeTab === "recurring" && (
           <>
-            <form onSubmit={handleAddRecurring} className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <form onSubmit={handleAddRecurring} className="mb-8 grid grid-cols-1 md:grid-cols-5 gap-4">
               <input
                 type="text"
                 placeholder="Tranzakció címe"
@@ -559,15 +581,6 @@ export default function LocalExpensesPage() {
                 <option value="expense">Kiadás</option>
               </select>
               <select
-                value={newRecurring.category}
-                onChange={(e) => setNewRecurring({ ...newRecurring, category: e.target.value })}
-                className="px-4 py-2 border rounded-lg"
-              >
-                {(newRecurring.type === "income" ? incomeCategories : expenseCategories).map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-              <select
                 value={newRecurring.interval}
                 onChange={(e) => setNewRecurring({ ...newRecurring, interval: e.target.value })}
                 className="px-4 py-2 border rounded-lg"
@@ -576,13 +589,6 @@ export default function LocalExpensesPage() {
                   <option key={interval.value} value={interval.value}>{interval.label}</option>
                 ))}
               </select>
-              <input
-                type="date"
-                value={newRecurring.startDate}
-                onChange={(e) => setNewRecurring({ ...newRecurring, startDate: e.target.value })}
-                className="px-4 py-2 border rounded-lg"
-                required
-              />
               <button
                 type="submit"
                 className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
@@ -603,20 +609,20 @@ export default function LocalExpensesPage() {
                           {transaction.type === "income" ? "💰" : "💸"} {transaction.title}
                         </p>
                         <p className="text-sm text-gray-700">Összeg: {transaction.amount} Ft</p>
-                        <p className="text-sm text-gray-700">Kategória: {transaction.category}</p>
-                        <p className="text-sm text-gray-700">
-                          Ismétlődés: {intervals.find(i => i.value === transaction.interval)?.label}
-                        </p>
+                        <p className="text-sm text-gray-700">Típus: {transaction.type === "income" ? "Bevétel" : "Kiadás"}</p>
+                        <p className="text-sm text-gray-700">Ismétlődés: {intervals.find(i => i.value === transaction.interval)?.label}</p>
                         <p className="text-sm text-gray-500">
-                          Kezdés: {new Date(transaction.startDate).toLocaleDateString("hu-HU")}
+                          Kezdés: {new Date(transaction.startDate).toLocaleString("hu-HU")}
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleDeleteRecurring(transaction.id)}
-                        className="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm"
-                      >
-                        Törlés
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleDeleteRecurring(transaction.id)}
+                          className="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm"
+                        >
+                          Törlés
+                        </button>
+                      </div>
                     </div>
                   </li>
                 ))}

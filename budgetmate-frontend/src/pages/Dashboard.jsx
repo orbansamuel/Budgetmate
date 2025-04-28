@@ -9,8 +9,10 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 } from 'chart.js';
+import { useAuth } from "../context/AuthContext";
 
 ChartJS.register(
   CategoryScale,
@@ -19,7 +21,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 export default function Dashboard() {
@@ -27,7 +30,10 @@ export default function Dashboard() {
   const [incomes, setIncomes] = useState([]);
   const [recurringTransactions, setRecurringTransactions] = useState([]);
   const [monthlyBudget, setMonthlyBudget] = useState(0);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem("user"));
+  const { logout } = useAuth();
 
   // --- Toggle for daily chart ---
   const [dailyChartType, setDailyChartType] = useState('expense'); // 'expense' or 'income'
@@ -42,30 +48,44 @@ export default function Dashboard() {
   const expenseCategories = ["Élelmiszer", "Számlák", "Szórakozás", "Közlekedés", "Egyéb"];
   const incomeCategories = ["Fizetés", "Bónusz", "Befektetés", "Egyéb"];
 
+  // Fetch all data on mount
   useEffect(() => {
-    // Load data from localStorage
-    const savedExpenses = localStorage.getItem('localExpenses');
-    const savedIncomes = localStorage.getItem('localIncomes');
-    const savedRecurring = localStorage.getItem('recurringTransactions');
-    const savedBudget = localStorage.getItem('monthlyBudget');
+    if (!user?.email) {
+      navigate("/login");
+      return;
+    }
 
-    if (savedExpenses) {
-      setExpenses(JSON.parse(savedExpenses));
-    }
-    if (savedIncomes) {
-      setIncomes(JSON.parse(savedIncomes));
-    }
-    if (savedRecurring) {
-      setRecurringTransactions(JSON.parse(savedRecurring));
-    }
-    if (savedBudget) {
-      setMonthlyBudget(parseFloat(savedBudget));
-    }
-  }, []);
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Fetch expenses
+        const expensesRes = await fetch(`${import.meta.env.VITE_API_BASE}/api/expenses/${encodeURIComponent(user.email)}`);
+        const expensesData = await expensesRes.json();
+        setExpenses(Array.isArray(expensesData) ? expensesData : []);
 
+        // Fetch incomes
+        const incomesRes = await fetch(`${import.meta.env.VITE_API_BASE}/api/incomes/${encodeURIComponent(user.email)}`);
+        const incomesData = await incomesRes.json();
+        setIncomes(Array.isArray(incomesData) ? incomesData : []);
+
+        // Fetch recurring transactions
+        const recurringRes = await fetch(`${import.meta.env.VITE_API_BASE}/api/recurring/${encodeURIComponent(user.email)}`);
+        const recurringData = await recurringRes.json();
+        setRecurringTransactions(Array.isArray(recurringData) ? recurringData : []);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        alert("Hiba történt az adatok betöltése során.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user?.email, navigate]);
+
+  // Calculate totals
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   const totalIncomes = incomes.reduce((sum, income) => sum + income.amount, 0);
-  const remainingBudget = monthlyBudget - totalExpenses;
   const balance = totalIncomes - totalExpenses;
 
   // Calculate average monthly income and expenses
@@ -210,25 +230,23 @@ export default function Dashboard() {
     }
   };
 
-  // Get expenses by category
+  // Get category breakdown
   const expensesByCategory = expenses.reduce((acc, expense) => {
     acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
     return acc;
   }, {});
 
-  // Get incomes by category
   const incomesByCategory = incomes.reduce((acc, income) => {
     acc[income.category] = (acc[income.category] || 0) + income.amount;
     return acc;
   }, {});
 
-  // Get recent expenses (last 5)
-  const recentExpenses = [...expenses]
+  // Külön legutóbbi kiadások és bevételek
+  const recentExpenses = expenses
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 5);
 
-  // Get recent incomes (last 5)
-  const recentIncomes = [...incomes]
+  const recentIncomes = incomes
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 5);
 
@@ -376,27 +394,53 @@ export default function Dashboard() {
     setQuickSuccess(false);
   }
 
-  function handleQuickAdd(e) {
+  async function handleQuickAdd(e) {
     e.preventDefault();
     if (!quickTitle || !quickAmount || isNaN(parseFloat(quickAmount))) return;
+
     const newItem = {
-      id: Date.now(),
       title: quickTitle,
       amount: parseFloat(quickAmount),
       category: quickCategory,
-      date: new Date().toISOString(),
-      type: quickType
+      userEmail: user.email,
     };
-    if (quickType === 'expense') {
-      setExpenses(prev => [...prev, newItem]);
-    } else {
-      setIncomes(prev => [...prev, newItem]);
+
+    try {
+      let url = "";
+      if (quickType === "expense") {
+        url = `${import.meta.env.VITE_API_BASE}/api/expenses`;
+      } else {
+        url = `${import.meta.env.VITE_API_BASE}/api/incomes`;
+      }
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newItem),
+      });
+      if (!res.ok) throw new Error("Hiba a mentés során");
+      const added = await res.json();
+
+      if (quickType === "expense") {
+        setExpenses(prev => [...prev, added]);
+      } else {
+        setIncomes(prev => [...prev, added]);
+      }
+      setQuickSuccess(true);
+      setTimeout(() => {
+        setShowQuickModal(false);
+        setQuickSuccess(false);
+      }, 1200);
+    } catch (err) {
+      alert("Nem sikerült menteni: " + err.message);
     }
-    setQuickSuccess(true);
-    setTimeout(() => {
-      setShowQuickModal(false);
-      setQuickSuccess(false);
-    }, 1200);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-100 via-red-100 to-pink-100 p-6 flex items-center justify-center">
+        <div className="text-2xl font-semibold text-gray-700">Betöltés...</div>
+      </div>
+    );
   }
 
   return (
@@ -434,7 +478,7 @@ export default function Dashboard() {
         {/* Right: Logout */}
         <div className="flex gap-2">
           <button
-            onClick={() => navigate("/bejelentkezes")}
+            onClick={() => { logout(); navigate("/bejelentkezes"); }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-lg font-bold rounded-full shadow-xl transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-200"
             title="Kijelentkezés"
             style={{boxShadow: '0 4px 16px 0 rgba(59,130,246,0.18)'}}
@@ -625,39 +669,50 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
+        {/* Recent Transactions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in mb-8">
+          {/* Legutóbbi Kiadások */}
           <div className="bg-white p-6 rounded-2xl shadow-lg">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Legutóbbi Kiadások</h3>
             <div className="space-y-4">
-              {recentExpenses.map((expense) => (
-                <div key={expense.id} className="flex justify-between items-center p-3 bg-red-50 rounded-xl shadow-sm hover:scale-[1.03] hover:bg-red-100 transition-all duration-200 group cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl text-red-400 group-hover:scale-125 transition-transform">💸</span>
-                    <div>
-                      <p className="font-medium text-gray-800">{expense.title}</p>
-                      <p className="text-sm text-gray-500">{new Date(expense.date).toLocaleString("hu-HU")}</p>
+              {recentExpenses.length === 0 ? (
+                <p className="text-gray-600">Nincsenek kiadások.</p>
+              ) : (
+                recentExpenses.map((expense, idx) => (
+                  <div key={`expense-${expense.id ?? 'noid'}-${idx}`} className="flex justify-between items-center p-4 border-b last:border-b-0">
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-3">💸</span>
+                      <div>
+                        <p className="font-medium">{expense.title}</p>
+                        <p className="text-sm text-gray-500">{new Date(expense.date).toLocaleString("hu-HU")}</p>
+                      </div>
                     </div>
+                    <p className="font-semibold text-red-600">{expense.amount.toLocaleString()} Ft</p>
                   </div>
-                  <span className="text-red-600 font-semibold text-lg">{expense.amount.toLocaleString()} Ft</span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
+          {/* Legutóbbi Bevételek */}
           <div className="bg-white p-6 rounded-2xl shadow-lg">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Legutóbbi Bevételek</h3>
             <div className="space-y-4">
-              {recentIncomes.map((income) => (
-                <div key={income.id} className="flex justify-between items-center p-3 bg-green-50 rounded-xl shadow-sm hover:scale-[1.03] hover:bg-green-100 transition-all duration-200 group cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl text-green-400 group-hover:scale-125 transition-transform">💰</span>
-                    <div>
-                      <p className="font-medium text-gray-800">{income.title}</p>
-                      <p className="text-sm text-gray-500">{new Date(income.date).toLocaleString("hu-HU")}</p>
+              {recentIncomes.length === 0 ? (
+                <p className="text-gray-600">Nincsenek bevételek.</p>
+              ) : (
+                recentIncomes.map((income, idx) => (
+                  <div key={`income-${income.id ?? 'noid'}-${idx}`} className="flex justify-between items-center p-4 border-b last:border-b-0">
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-3">💰</span>
+                      <div>
+                        <p className="font-medium">{income.title}</p>
+                        <p className="text-sm text-gray-500">{new Date(income.date).toLocaleString("hu-HU")}</p>
+                      </div>
                     </div>
+                    <p className="font-semibold text-green-600">{income.amount.toLocaleString()} Ft</p>
                   </div>
-                  <span className="text-green-600 font-semibold text-lg">{income.amount.toLocaleString()} Ft</span>
-                </div>
-              ))}
+                ))  
+              )}
             </div>
           </div>
         </div>
@@ -671,7 +726,7 @@ export default function Dashboard() {
             Kiadások kezelése
           </button>
           <button
-            onClick={() => navigate("/local-expenses")}
+            onClick={() => navigate("/local-expenses?tab=incomes")}
             className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 shadow-lg transition-all duration-200"
             title="Bevételek részletes kezelése"
           >

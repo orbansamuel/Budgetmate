@@ -15,6 +15,7 @@ public class Expense {
     private String title;
     private double amount;
     private LocalDateTime date;
+    private String category;
 
     @ManyToOne
     @JsonBackReference
@@ -57,6 +58,10 @@ public class Expense {
         return date;
     }
 
+    public String getCategory() {
+        return category;
+    }
+
     public void setId(Long id) {
         this.id = id;
     }
@@ -71,5 +76,9 @@ public class Expense {
 
     public void setDate(LocalDateTime date) {
         this.date = date;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 }

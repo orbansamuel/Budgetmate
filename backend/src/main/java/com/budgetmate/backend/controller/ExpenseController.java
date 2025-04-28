@@ -46,4 +46,25 @@ public class ExpenseController {
         List<Expense> expenses = expenseRepository.findByUser(user.get());
         return ResponseEntity.ok(expenses);
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Expense> updateExpense(@PathVariable Long id, @RequestBody Expense updated) {
+        return expenseRepository.findById(id).map(expense -> {
+            expense.setTitle(updated.getTitle());
+            expense.setAmount(updated.getAmount());
+            expense.setCategory(updated.getCategory());
+            expense.setDate(updated.getDate());
+            expense.setUser(updated.getUser());
+            return ResponseEntity.ok(expenseRepository.save(expense));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteExpense(@PathVariable Long id) {
+        if (!expenseRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        expenseRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
+    }
 }
